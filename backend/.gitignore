@@ -1,0 +1,4 @@
+*.db
+*.exe
+build/
+*.log
