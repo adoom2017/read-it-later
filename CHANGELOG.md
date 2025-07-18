@@ -5,7 +5,7 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/) 规范。
 
-## [Unreleased]
+## [1.1.0]
 
 ### 新增
 - 🐳 **GitHub Actions 自动化部署**：创建 release 时自动构建并推送到 DockerHub
