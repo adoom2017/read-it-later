@@ -1,5 +1,5 @@
 # 使用官方的 Node.js 镜像作为构建环境
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 
 # 设置工作目录
 WORKDIR /app
@@ -7,8 +7,8 @@ WORKDIR /app
 # 复制 package.json 和 package-lock.json（如果存在）
 COPY package*.json ./
 
-# 安装依赖
-RUN npm ci --only=production
+# 安装依赖（包括开发依赖，构建时需要）
+RUN npm ci
 
 # 复制源代码
 COPY . .
