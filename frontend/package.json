@@ -1,7 +1,25 @@
 {
-  "name": "frontend",
-  "version": "0.1.0",
-  "private": true,
+  "name": "read-it-later-frontend",
+  "version": "1.0.0",
+  "description": "Read It Later 应用的前端部分",
+  "private": false,
+  "license": "MIT",
+  "author": "adoom2017",
+  "homepage": "https://github.com/adoom2017/read-it-later",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/adoom2017/read-it-later.git"
+  },
+  "bugs": {
+    "url": "https://github.com/adoom2017/read-it-later/issues"
+  },
+  "keywords": [
+    "react",
+    "read-later",
+    "bookmark",
+    "article",
+    "reader"
+  ],
   "dependencies": {
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",

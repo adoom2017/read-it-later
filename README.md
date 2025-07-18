@@ -1,5 +1,11 @@
 # Read It Later - 完整应用
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8?logo=go)](https://golang.org/)
+[![React Version](https://img.shields.io/badge/React-18+-61DAFB?logo=react)](https://reactjs.org/)
+[![Docker](https://img.shields.io/badge/Docker-Available-2496ED?logo=docker)](https://www.docker.com/)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/adoom2017/read-it-later/pulls)
+
 一个基于 React + Go 的稍后阅读应用，支持保存网页文章、提取内容、添加标签等功能。
 
 ## 功能特性
@@ -89,15 +95,42 @@ go run main.go
 
 ## 贡献指南
 
+我们欢迎任何形式的贡献！请阅读我们的[贡献指南](CONTRIBUTING.md)了解如何参与项目开发。
+
+### 快速贡献
+
 1. Fork 本仓库
 2. 创建功能分支 (`git checkout -b feature/amazing-feature`)
 3. 提交更改 (`git commit -m 'Add some amazing feature'`)
 4. 推送到分支 (`git push origin feature/amazing-feature`)
 5. 创建 Pull Request
 
+### 开发规范
+
+- 遵循现有的代码风格
+- 添加适当的测试
+- 更新相关文档
+- 确保所有测试通过
+
+## 社区
+
+- 📢 [问题和建议](https://github.com/adoom2017/read-it-later/issues)
+- 💬 [讨论区](https://github.com/adoom2017/read-it-later/discussions)
+- 📖 [项目文档](https://github.com/adoom2017/read-it-later/wiki)
+
 ## 许可证
 
 本项目采用 MIT 许可证 - 详情请参阅 [LICENSE](LICENSE) 文件。
+
+### 第三方许可证
+
+本项目使用了以下开源项目：
+
+- [React](https://github.com/facebook/react) - MIT License
+- [Go](https://github.com/golang/go) - BSD 3-Clause License
+- [Gin](https://github.com/gin-gonic/gin) - MIT License
+- [Vite](https://github.com/vitejs/vite) - MIT License
+- [go-readability](https://github.com/go-shiori/go-readability) - MIT License
 
 ## 更新日志
 
