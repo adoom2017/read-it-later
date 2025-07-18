@@ -38,7 +38,51 @@
 
 ## 快速开始
 
-### 使用 Docker 部署（推荐）
+### 🚀 一键部署（推荐）
+
+使用 DockerHub 镜像快速部署：
+
+```bash
+# 使用最新版本
+curl -fsSL https://raw.githubusercontent.com/adoom2017/read-it-later/main/deploy-dockerhub.sh | bash
+
+# 使用指定版本
+curl -fsSL https://raw.githubusercontent.com/adoom2017/read-it-later/main/deploy-dockerhub.sh | bash -s -- -v v1.0.0
+```
+
+### 🐳 使用 Docker Hub 镜像
+
+```bash
+# 创建数据目录
+mkdir -p ./data
+
+# 创建 docker-compose.yml
+cat > docker-compose.yml << 'EOF'
+version: '3.8'
+
+services:
+  backend:
+    image: adoom2017/read-it-later-backend:latest
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - GIN_MODE=release
+
+  frontend:
+    image: adoom2017/read-it-later-frontend:latest
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+EOF
+
+# 启动服务
+docker-compose up -d
+```
+
+### 🔧 使用 Docker 本地构建
 
 ```bash
 # 克隆项目
@@ -50,7 +94,7 @@ chmod +x deploy.sh
 ./deploy.sh
 ```
 
-### 手动部署
+### 📋 手动部署
 
 ```bash
 # 构建并启动服务

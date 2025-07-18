@@ -1,0 +1,228 @@
+name: Build and Push Docker Images
+
+on:
+  release:
+    types: [published]
+
+env:
+  REGISTRY: docker.io
+  IMAGE_NAME_FRONTEND: adoom2018/read-it-later-frontend
+  IMAGE_NAME_BACKEND: adoom2018/read-it-later-backend
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Extract metadata for frontend
+      id: meta-frontend
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.IMAGE_NAME_FRONTEND }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=semver,pattern={{major}}
+          type=raw,value=latest,enable={{is_default_branch}}
+
+    - name: Extract metadata for backend
+      id: meta-backend
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.IMAGE_NAME_BACKEND }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=semver,pattern={{major}}
+          type=raw,value=latest,enable={{is_default_branch}}
+
+    - name: Build and push frontend image
+      uses: docker/build-push-action@v5
+      with:
+        context: ./frontend
+        file: ./frontend/Dockerfile
+        push: true
+        tags: ${{ steps.meta-frontend.outputs.tags }}
+        labels: ${{ steps.meta-frontend.outputs.labels }}
+        platforms: linux/amd64,linux/arm64
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Build and push backend image
+      uses: docker/build-push-action@v5
+      with:
+        context: ./backend
+        file: ./backend/Dockerfile
+        push: true
+        tags: ${{ steps.meta-backend.outputs.tags }}
+        labels: ${{ steps.meta-backend.outputs.labels }}
+        platforms: linux/amd64,linux/arm64
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Update docker-compose for production
+      run: |
+        # 获取发布版本号
+        VERSION=${GITHUB_REF#refs/tags/}
+        
+        # 创建生产环境的 docker-compose 文件
+        cat > docker-compose.release.yml << EOF
+        version: '3.8'
+        
+        services:
+          backend:
+            image: ${{ env.IMAGE_NAME_BACKEND }}:${VERSION}
+            container_name: read-it-later-backend
+            restart: unless-stopped
+            ports:
+              - "8080:8080"
+            volumes:
+              - ./data:/app/data
+            environment:
+              - GIN_MODE=release
+            networks:
+              - app-network
+            healthcheck:
+              test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/"]
+              interval: 30s
+              timeout: 10s
+              retries: 3
+              start_period: 30s
+        
+          frontend:
+            image: ${{ env.IMAGE_NAME_FRONTEND }}:${VERSION}
+            container_name: read-it-later-frontend
+            restart: unless-stopped
+            ports:
+              - "80:80"
+              - "443:443"
+            depends_on:
+              - backend
+            networks:
+              - app-network
+            healthcheck:
+              test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/"]
+              interval: 30s
+              timeout: 10s
+              retries: 3
+              start_period: 30s
+        
+        networks:
+          app-network:
+            driver: bridge
+        EOF
+
+    - name: Upload docker-compose.release.yml as artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: docker-compose-release
+        path: docker-compose.release.yml
+
+    - name: Create deployment instructions
+      run: |
+        VERSION=${GITHUB_REF#refs/tags/}
+        cat > DEPLOYMENT_INSTRUCTIONS.md << EOF
+        # 部署说明 - 版本 ${VERSION}
+
+        ## 使用 Docker Hub 镜像部署
+
+        1. 下载 docker-compose.release.yml 文件
+        2. 创建数据目录：
+           \`\`\`bash
+           mkdir -p ./data
+           \`\`\`
+
+        3. 启动服务：
+           \`\`\`bash
+           docker-compose -f docker-compose.release.yml up -d
+           \`\`\`
+
+        4. 检查服务状态：
+           \`\`\`bash
+           docker-compose -f docker-compose.release.yml ps
+           \`\`\`
+
+        ## 镜像信息
+
+        - Frontend: \`${{ env.IMAGE_NAME_FRONTEND }}:${VERSION}\`
+        - Backend: \`${{ env.IMAGE_NAME_BACKEND }}:${VERSION}\`
+
+        ## 服务地址
+
+        - 前端: http://localhost
+        - 后端 API: http://localhost:8080
+        - 健康检查: http://localhost:8080/health
+
+        ## 更新到新版本
+
+        1. 拉取新镜像：
+           \`\`\`bash
+           docker-compose -f docker-compose.release.yml pull
+           \`\`\`
+
+        2. 重启服务：
+           \`\`\`bash
+           docker-compose -f docker-compose.release.yml up -d
+           \`\`\`
+
+        ## 数据备份
+
+        数据存储在 \`./data\` 目录中，请定期备份此目录。
+        EOF
+
+    - name: Upload deployment instructions as artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: deployment-instructions
+        path: DEPLOYMENT_INSTRUCTIONS.md
+
+  security-scan:
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: github.event_name == 'release'
+    
+    steps:
+    - name: Run Trivy vulnerability scanner for frontend
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: ${{ env.IMAGE_NAME_FRONTEND }}:${{ github.ref_name }}
+        format: 'sarif'
+        output: 'trivy-frontend-results.sarif'
+
+    - name: Run Trivy vulnerability scanner for backend
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: ${{ env.IMAGE_NAME_BACKEND }}:${{ github.ref_name }}
+        format: 'sarif'
+        output: 'trivy-backend-results.sarif'
+
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: 'trivy-frontend-results.sarif'
+
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: 'trivy-backend-results.sarif'
