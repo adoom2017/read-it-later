@@ -106,6 +106,16 @@ func GetAllArticles() ([]model.Article, error) {
 		if err := rows.Scan(&article.ID, &article.URL, &article.Title, &article.Excerpt, &article.ImageURL, &article.CreatedAt); err != nil {
 			return nil, err
 		}
+
+		// Get tags for this article
+		tags, err := GetTagsForArticle(article.ID)
+		if err != nil {
+			// Log the error but don't fail the entire request
+			log.Printf("Error getting tags for article %d: %v", article.ID, err)
+			tags = []model.Tag{} // Empty slice instead of nil
+		}
+		article.Tags = tags
+
 		articles = append(articles, article)
 	}
 
@@ -222,6 +232,31 @@ func AddTagToArticleByID(articleID int, tagName string) error {
 	return err
 }
 
+// RemoveTagFromArticle removes a tag from an article.
+func RemoveTagFromArticle(articleID int, tagID int) error {
+	stmt, err := DB.Prepare("DELETE FROM article_tags WHERE article_id = ? AND tag_id = ?")
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	result, err := stmt.Exec(articleID, tagID)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected == 0 {
+		return sql.ErrNoRows
+	}
+
+	return nil
+}
+
 // GetTagsForArticle retrieves all tags for a specific article.
 func GetTagsForArticle(articleID int) ([]model.Tag, error) {
 	rows, err := DB.Query(`
@@ -244,4 +279,68 @@ func GetTagsForArticle(articleID int) ([]model.Tag, error) {
 	}
 
 	return tags, nil
+}
+
+// SearchArticlesByTitle searches articles by title using LIKE query.
+func SearchArticlesByTitle(query string) ([]model.Article, error) {
+	rows, err := DB.Query("SELECT id, url, title, excerpt, image_url, created_at FROM articles WHERE title LIKE ? ORDER BY created_at DESC", "%"+query+"%")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var articles []model.Article
+	for rows.Next() {
+		var article model.Article
+		if err := rows.Scan(&article.ID, &article.URL, &article.Title, &article.Excerpt, &article.ImageURL, &article.CreatedAt); err != nil {
+			return nil, err
+		}
+
+		// Get tags for this article
+		tags, err := GetTagsForArticle(article.ID)
+		if err != nil {
+			log.Printf("Error getting tags for article %d: %v", article.ID, err)
+			tags = []model.Tag{}
+		}
+		article.Tags = tags
+
+		articles = append(articles, article)
+	}
+
+	return articles, nil
+}
+
+// SearchArticlesByTag searches articles by tag name.
+func SearchArticlesByTag(tagName string) ([]model.Article, error) {
+	rows, err := DB.Query(`
+		SELECT a.id, a.url, a.title, a.excerpt, a.image_url, a.created_at
+		FROM articles a
+		JOIN article_tags at ON a.id = at.article_id
+		JOIN tags t ON at.tag_id = t.id
+		WHERE t.name LIKE ?
+		ORDER BY a.created_at DESC`, "%"+tagName+"%")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var articles []model.Article
+	for rows.Next() {
+		var article model.Article
+		if err := rows.Scan(&article.ID, &article.URL, &article.Title, &article.Excerpt, &article.ImageURL, &article.CreatedAt); err != nil {
+			return nil, err
+		}
+
+		// Get tags for this article
+		tags, err := GetTagsForArticle(article.ID)
+		if err != nil {
+			log.Printf("Error getting tags for article %d: %v", article.ID, err)
+			tags = []model.Tag{}
+		}
+		article.Tags = tags
+
+		articles = append(articles, article)
+	}
+
+	return articles, nil
 }

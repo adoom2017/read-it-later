@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import ArticleList from './components/ArticleList';
+import SearchBar from './components/SearchBar';
 import './App.css';
 
 function App() {
@@ -9,6 +10,9 @@ function App() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [selectedArticle, setSelectedArticle] = useState(null);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState([]);
+  const [currentSearchQuery, setCurrentSearchQuery] = useState('');
 
   // Fetch articles on component mount
   useEffect(() => {
@@ -69,8 +73,39 @@ function App() {
       const response = await axios.get('/api/articles');
       setArticles(response.data || []);
       setError('');
+      
+      // 如果正在搜索，也更新搜索结果
+      if (isSearching) {
+        // 重新执行搜索以更新结果
+        const searchType = currentSearchQuery.includes('#') ? 'tag' : 'title';
+        await handleSearch(currentSearchQuery, searchType);
+      }
     } catch (err) {
       setError('Failed to add tag.');
+      console.error(err);
+    }
+  };
+
+  // 删除标签功能
+  const handleRemoveTag = async (articleId, tagId) => {
+    if (!window.confirm('确定要删除这个标签吗？')) {
+      return;
+    }
+
+    try {
+      await axios.delete(`/api/articles/${articleId}/tags/${tagId}`);
+      // 重新获取文章列表以显示更新的标签
+      const response = await axios.get('/api/articles');
+      setArticles(response.data || []);
+      setError('');
+      
+      // 如果正在搜索，也更新搜索结果
+      if (isSearching) {
+        const searchType = currentSearchQuery.includes('#') ? 'tag' : 'title';
+        await handleSearch(currentSearchQuery, searchType);
+      }
+    } catch (err) {
+      setError('Failed to remove tag.');
       console.error(err);
     }
   };
@@ -89,6 +124,33 @@ function App() {
 
   const closeArticleDetail = () => {
     setSelectedArticle(null);
+  };
+
+  // 搜索功能
+  const handleSearch = async (query, searchType) => {
+    setLoading(true);
+    setError('');
+    
+    try {
+      const params = searchType === 'title' ? { q: query } : { tag: query };
+      const response = await axios.get('/api/articles/search', { params });
+      setSearchResults(response.data || []);
+      setIsSearching(true);
+      setCurrentSearchQuery(query);
+    } catch (err) {
+      setError('搜索失败，请重试。');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 清除搜索
+  const handleClearSearch = () => {
+    setIsSearching(false);
+    setSearchResults([]);
+    setCurrentSearchQuery('');
+    setError('');
   };
 
   return (
@@ -112,10 +174,25 @@ function App() {
           </button>
         </form>
         {error && <p className="error-message">{error}</p>}
+        
+        {/* 搜索组件 */}
+        <SearchBar onSearch={handleSearch} onClear={handleClearSearch} />
+        
+        {/* 显示搜索结果或所有文章 */}
+        {isSearching && (
+          <div className="search-results-header">
+            <h3>搜索结果: "{currentSearchQuery}" ({searchResults.length} 条结果)</h3>
+            <button onClick={handleClearSearch} className="back-to-all-btn">
+              返回所有文章
+            </button>
+          </div>
+        )}
+        
         <ArticleList
-          articles={articles}
+          articles={isSearching ? searchResults : articles}
           onDeleteArticle={handleDeleteArticle}
           onAddTag={handleAddTag}
+          onRemoveTag={handleRemoveTag}
           onViewArticle={handleViewArticle}
         />
 
@@ -141,9 +218,25 @@ function App() {
                 {selectedArticle.tags && selectedArticle.tags.length > 0 && (
                   <div className="tags-section">
                     <strong>Tags: </strong>
-                    {selectedArticle.tags.map(tag => (
-                      <span key={tag.id} className="tag">{tag.name}</span>
-                    ))}
+                    <div className="modal-tags">
+                      {selectedArticle.tags.map(tag => (
+                        <span key={tag.id} className="tag-with-delete">
+                          <span className="tag-name">{tag.name}</span>
+                          <button 
+                            className="tag-delete-btn"
+                            onClick={async () => {
+                              await handleRemoveTag(selectedArticle.id, tag.id);
+                              // 更新模态框中的文章数据
+                              const response = await axios.get(`/api/articles/${selectedArticle.id}`);
+                              setSelectedArticle(response.data);
+                            }}
+                            title="删除标签"
+                          >
+                            ✕
+                          </button>
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 )}
                 <div className="article-actions">

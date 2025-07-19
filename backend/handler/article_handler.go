@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"net/http"
 	"read-it-later/backend/extractor"
+	"read-it-later/backend/model"
 	"read-it-later/backend/store"
 	"strconv"
 
@@ -45,6 +46,35 @@ func GetArticles(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve articles"})
 		return
 	}
+	c.JSON(http.StatusOK, articles)
+}
+
+// SearchArticles handles searching articles by title or tags.
+func SearchArticles(c *gin.Context) {
+	query := c.Query("q")
+	tag := c.Query("tag")
+
+	if query == "" && tag == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Search query or tag is required"})
+		return
+	}
+
+	var articles []model.Article
+	var err error
+
+	if tag != "" {
+		// Search by tag
+		articles, err = store.SearchArticlesByTag(tag)
+	} else if query != "" {
+		// Search by title
+		articles, err = store.SearchArticlesByTitle(query)
+	}
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to search articles"})
+		return
+	}
+
 	c.JSON(http.StatusOK, articles)
 }
 
@@ -99,6 +129,35 @@ func AddTagToArticle(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Tag added successfully"})
+}
+
+// RemoveTagFromArticle handles removing a tag from an article.
+func RemoveTagFromArticle(c *gin.Context) {
+	idParam := c.Param("id")
+	articleID, err := strconv.Atoi(idParam)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid article ID"})
+		return
+	}
+
+	tagIdParam := c.Param("tagId")
+	tagID, err := strconv.Atoi(tagIdParam)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid tag ID"})
+		return
+	}
+
+	err = store.RemoveTagFromArticle(articleID, tagID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Article or tag not found"})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to remove tag from article"})
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Tag removed successfully"})
 }
 
 // DeleteArticle handles deleting an article.

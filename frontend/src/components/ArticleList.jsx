@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-const ArticleList = ({ articles, onDeleteArticle, onAddTag, onViewArticle }) => {
+const ArticleList = ({ articles, onDeleteArticle, onAddTag, onRemoveTag, onViewArticle }) => {
   const [tagInputs, setTagInputs] = useState({});
 
   const handleTagInputChange = (articleId, value) => {
@@ -37,18 +37,27 @@ const ArticleList = ({ articles, onDeleteArticle, onAddTag, onViewArticle }) => 
         <div key={article.id} className="article-card">
           {article.image_url && <img src={article.image_url} alt={article.title} />}
           <div className="article-card-content">
-            <h2>{article.title}</h2>
+            <div className="title-with-tags">
+              <h2>{article.title}</h2>
+              {/* 在标题后面显示标签 */}
+              {article.tags && article.tags.length > 0 && (
+                <div className="inline-tags">
+                  {article.tags.map(tag => (
+                    <span key={tag.id} className="tag-with-delete">
+                      <span className="tag-name">{tag.name}</span>
+                      <button 
+                        className="tag-delete-btn"
+                        onClick={() => onRemoveTag(article.id, tag.id)}
+                        title="删除标签"
+                      >
+                        ✕
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
             <p>{article.excerpt}</p>
-
-            {/* 显示标签 */}
-            {article.tags && article.tags.length > 0 && (
-              <div className="tags-section">
-                <strong>Tags: </strong>
-                {article.tags.map(tag => (
-                  <span key={tag.id} className="tag">{tag.name}</span>
-                ))}
-              </div>
-            )}
 
             {/* 添加标签区域 */}
             <div className="add-tag-section">

@@ -49,9 +49,11 @@ func main() {
 	api := router.Group("/api")
 	{
 		api.GET("/articles", handler.GetArticles)
+		api.GET("/articles/search", handler.SearchArticles)
 		api.POST("/articles", handler.AddArticle)
 		api.GET("/articles/:id", handler.GetArticle)
 		api.POST("/articles/:id/tags", handler.AddTagToArticle)
+		api.DELETE("/articles/:id/tags/:tagId", handler.RemoveTagFromArticle)
 		api.DELETE("/articles/:id", handler.DeleteArticle)
 	}
 
