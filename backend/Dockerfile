@@ -17,17 +17,31 @@ RUN go mod download
 COPY . .
 
 # 构建应用
-RUN CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo -o main .
+RUN CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo -o main . && \
+    ls -la /app/main
 
-# 使用轻量级的 Alpine 镜像作为运行环境
+# 使用 Alpine 镜像作为运行环境（与构建环境保持一致）
 FROM alpine:latest
 
-# 安装必要的运行时依赖
-RUN apk --no-cache add ca-certificates tzdata sqlite curl
+# 安装运行时依赖和 Chrome
+RUN apk add --no-cache \
+    ca-certificates \
+    tzdata \
+    sqlite \
+    curl \
+    chromium \
+    chromium-chromedriver \
+    xvfb-run \
+    font-noto-emoji \
+    ttf-freefont \
+    && rm -rf /var/cache/apk/*
+
+# 设置时区环境变量
+ENV TZ=UTC
 
 # 创建非root用户
-RUN addgroup -g 1001 -S appgroup && \
-    adduser -S appuser -u 1001 -G appgroup
+RUN addgroup -g 1001 appgroup && \
+    adduser -D -u 1001 -G appgroup -s /bin/sh appuser
 
 # 设置工作目录
 WORKDIR /app

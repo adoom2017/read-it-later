@@ -55,6 +55,9 @@ func main() {
 		api.POST("/articles/:id/tags", handler.AddTagToArticle)
 		api.DELETE("/articles/:id/tags/:tagId", handler.RemoveTagFromArticle)
 		api.DELETE("/articles/:id", handler.DeleteArticle)
+
+		// Image proxy to handle anti-hotlinking
+		api.GET("/proxy/image", handler.ProxyImage)
 	}
 
 	// Simple health check route
