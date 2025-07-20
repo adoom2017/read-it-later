@@ -239,6 +239,21 @@ main {
   margin-top: 10px;
 }
 
+/* 摘要特殊样式 */
+.article-excerpt {
+  font-size: 0.95rem !important;
+  color: #666 !important;
+  line-height: 1.5 !important;
+  margin: 12px 0 !important;
+  max-height: 4.5em; /* 限制最大高度，约3行文字 */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 3; /* 限制显示3行 */
+  line-clamp: 3; /* 标准属性 */
+  -webkit-box-orient: vertical;
+}
+
 .article-card-content a {
   color: #3498db;
   text-decoration: none;
@@ -571,4 +586,80 @@ main {
   .search-results-header h3 {
     text-align: center;
   }
+}
+
+/* 认证相关样式 */
+.auth-section {
+  margin-top: 20px;
+  padding: 15px;
+  background-color: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.login-btn {
+  background-color: #007bff;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: background-color 0.2s;
+}
+
+.login-btn:hover {
+  background-color: #0056b3;
+}
+
+.auth-required {
+  text-align: center;
+  padding: 60px 20px;
+}
+
+.auth-prompt {
+  background-color: #ffffff;
+  padding: 40px;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.auth-prompt h3 {
+  color: #333;
+  margin-bottom: 15px;
+}
+
+.auth-prompt p {
+  color: #666;
+  margin-bottom: 25px;
+  line-height: 1.5;
+}
+
+.auth-prompt-btn {
+  background-color: #28a745;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: background-color 0.2s;
+}
+
+.auth-prompt-btn:hover {
+  background-color: #218838;
+}
+
+.loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 200px;
+}
+
+.loading-container p {
+  font-size: 18px;
+  color: #666;
 }

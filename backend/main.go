@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"read-it-later/backend/handler"
+	"read-it-later/backend/middleware"
 	"read-it-later/backend/store"
 
 	"github.com/gin-gonic/gin"
@@ -48,15 +49,34 @@ func main() {
 	// API routes
 	api := router.Group("/api")
 	{
-		api.GET("/articles", handler.GetArticles)
-		api.GET("/articles/search", handler.SearchArticles)
-		api.POST("/articles", handler.AddArticle)
-		api.GET("/articles/:id", handler.GetArticle)
-		api.POST("/articles/:id/tags", handler.AddTagToArticle)
-		api.DELETE("/articles/:id/tags/:tagId", handler.RemoveTagFromArticle)
-		api.DELETE("/articles/:id", handler.DeleteArticle)
+		// 认证相关路由（公开访问）
+		auth := api.Group("/auth")
+		{
+			auth.POST("/register", handler.Register)
+			auth.POST("/login", handler.Login)
+		}
 
-		// Image proxy to handle anti-hotlinking
+		// 用户相关路由（需要认证）
+		user := api.Group("/user")
+		user.Use(middleware.AuthMiddleware())
+		{
+			user.GET("/profile", handler.GetProfile)
+		}
+
+		// 需要认证的文章相关路由
+		articles := api.Group("/articles")
+		articles.Use(middleware.AuthMiddleware())
+		{
+			articles.GET("", handler.GetArticles)
+			articles.GET("/search", handler.SearchArticles)
+			articles.POST("", handler.AddArticle)
+			articles.GET("/:id", handler.GetArticle)
+			articles.POST("/:id/tags", handler.AddTagToArticle)
+			articles.DELETE("/:id/tags/:tagId", handler.RemoveTagFromArticle)
+			articles.DELETE("/:id", handler.DeleteArticle)
+		}
+
+		// Image proxy to handle anti-hotlinking (公开访问)
 		api.GET("/proxy/image", handler.ProxyImage)
 	}
 

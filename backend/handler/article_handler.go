@@ -13,6 +13,13 @@ import (
 
 // AddArticle handles the creation of a new article from a URL.
 func AddArticle(c *gin.Context) {
+	// 获取用户ID
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
 	var json struct {
 		URL string `json:"url" binding:"required"`
 	}
@@ -29,6 +36,9 @@ func AddArticle(c *gin.Context) {
 		return
 	}
 
+	// 设置用户ID
+	article.UserID = userID.(int)
+
 	// Save the article to the database
 	savedArticle, err := store.SaveArticle(article)
 	if err != nil {
@@ -39,9 +49,16 @@ func AddArticle(c *gin.Context) {
 	c.JSON(http.StatusCreated, savedArticle)
 }
 
-// GetArticles handles listing all articles.
+// GetArticles handles listing all articles for the authenticated user.
 func GetArticles(c *gin.Context) {
-	articles, err := store.GetAllArticles()
+	// 获取用户ID
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	articles, err := store.GetAllArticles(userID.(int))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve articles"})
 		return
@@ -51,6 +68,13 @@ func GetArticles(c *gin.Context) {
 
 // SearchArticles handles searching articles by title or tags.
 func SearchArticles(c *gin.Context) {
+	// 获取用户ID
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
 	query := c.Query("q")
 	tag := c.Query("tag")
 
@@ -64,10 +88,10 @@ func SearchArticles(c *gin.Context) {
 
 	if tag != "" {
 		// Search by tag
-		articles, err = store.SearchArticlesByTag(tag)
+		articles, err = store.SearchArticlesByTag(tag, userID.(int))
 	} else if query != "" {
 		// Search by title
-		articles, err = store.SearchArticlesByTitle(query)
+		articles, err = store.SearchArticlesByTitle(query, userID.(int))
 	}
 
 	if err != nil {
@@ -78,8 +102,15 @@ func SearchArticles(c *gin.Context) {
 	c.JSON(http.StatusOK, articles)
 }
 
-// GetArticle handles retrieving a single article by its ID.
+// GetArticle handles retrieving a single article by its ID for the authenticated user.
 func GetArticle(c *gin.Context) {
+	// 获取用户ID
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
 	idParam := c.Param("id")
 	id, err := strconv.Atoi(idParam)
 	if err != nil {
@@ -87,7 +118,7 @@ func GetArticle(c *gin.Context) {
 		return
 	}
 
-	article, err := store.GetArticleByID(id)
+	article, err := store.GetArticleByID(id, userID.(int))
 	if err != nil {
 		if err == sql.ErrNoRows {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Article not found"})
@@ -102,6 +133,13 @@ func GetArticle(c *gin.Context) {
 
 // AddTagToArticle handles adding a tag to an article.
 func AddTagToArticle(c *gin.Context) {
+	// 获取用户ID
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
 	idParam := c.Param("id")
 	articleID, err := strconv.Atoi(idParam)
 	if err != nil {
@@ -118,7 +156,7 @@ func AddTagToArticle(c *gin.Context) {
 		return
 	}
 
-	err = store.AddTagToArticleByID(articleID, json.TagName)
+	err = store.AddTagToArticleByID(articleID, json.TagName, userID.(int))
 	if err != nil {
 		if err == sql.ErrNoRows {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Article not found"})
@@ -160,8 +198,15 @@ func RemoveTagFromArticle(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Tag removed successfully"})
 }
 
-// DeleteArticle handles deleting an article.
+// DeleteArticle handles deleting an article for the authenticated user.
 func DeleteArticle(c *gin.Context) {
+	// 获取用户ID
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
 	idParam := c.Param("id")
 	id, err := strconv.Atoi(idParam)
 	if err != nil {
@@ -169,7 +214,7 @@ func DeleteArticle(c *gin.Context) {
 		return
 	}
 
-	err = store.DeleteArticleByID(id)
+	err = store.DeleteArticleByID(id, userID.(int))
 	if err != nil {
 		if err == sql.ErrNoRows {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Article not found"})

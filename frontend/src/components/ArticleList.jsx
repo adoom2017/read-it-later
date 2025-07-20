@@ -3,6 +3,13 @@ import React, { useState } from 'react';
 const ArticleList = ({ articles, onDeleteArticle, onAddTag, onRemoveTag, onViewArticle }) => {
   const [tagInputs, setTagInputs] = useState({});
 
+  // 截断文本函数，超过指定长度显示省略号
+  const truncateText = (text, maxLength = 150) => {
+    if (!text) return '';
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength).trim() + '...';
+  };
+
   const handleTagInputChange = (articleId, value) => {
     setTagInputs(prev => ({
       ...prev,
@@ -57,7 +64,7 @@ const ArticleList = ({ articles, onDeleteArticle, onAddTag, onRemoveTag, onViewA
                 </div>
               )}
             </div>
-            <p>{article.excerpt}</p>
+            <p className="article-excerpt">{truncateText(article.excerpt)}</p>
 
             {/* 添加标签区域 */}
             <div className="add-tag-section">

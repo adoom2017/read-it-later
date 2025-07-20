@@ -27,21 +27,38 @@ func InitDB(dataSourceName string) {
 
 // createTables creates the necessary tables in the database.
 func createTables() {
+	// 用户表
+	usersTable := `
+	CREATE TABLE IF NOT EXISTS users (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		username TEXT NOT NULL UNIQUE,
+		email TEXT NOT NULL UNIQUE,
+		password TEXT NOT NULL,
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	);`
+
+	// 修改文章表，添加用户ID
 	articlesTable := `
 	CREATE TABLE IF NOT EXISTS articles (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		url TEXT NOT NULL UNIQUE,
+		user_id INTEGER NOT NULL,
+		url TEXT NOT NULL,
 		title TEXT NOT NULL,
 		content TEXT,
 		excerpt TEXT,
 		image_url TEXT,
-		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+		UNIQUE(user_id, url)
 	);`
 
 	tagsTable := `
 	CREATE TABLE IF NOT EXISTS tags (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		name TEXT NOT NULL UNIQUE
+		user_id INTEGER NOT NULL,
+		name TEXT NOT NULL,
+		FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+		UNIQUE(user_id, name)
 	);`
 
 	articleTagsTable := `
@@ -53,7 +70,13 @@ func createTables() {
 		FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
 	);`
 
-	_, err := DB.Exec(articlesTable)
+	// 执行表创建
+	_, err := DB.Exec(usersTable)
+	if err != nil {
+		log.Fatalf("Error creating users table: %v", err)
+	}
+
+	_, err = DB.Exec(articlesTable)
 	if err != nil {
 		log.Fatalf("Error creating articles table: %v", err)
 	}
@@ -71,13 +94,13 @@ func createTables() {
 
 // SaveArticle inserts a new article into the database and returns it with the new ID.
 func SaveArticle(article model.Article) (model.Article, error) {
-	stmt, err := DB.Prepare("INSERT INTO articles(url, title, content, excerpt, image_url) VALUES(?, ?, ?, ?, ?)")
+	stmt, err := DB.Prepare("INSERT INTO articles(user_id, url, title, content, excerpt, image_url) VALUES(?, ?, ?, ?, ?, ?)")
 	if err != nil {
 		return model.Article{}, err
 	}
 	defer stmt.Close()
 
-	res, err := stmt.Exec(article.URL, article.Title, article.Content, article.Excerpt, article.ImageURL)
+	res, err := stmt.Exec(article.UserID, article.URL, article.Title, article.Content, article.Excerpt, article.ImageURL)
 	if err != nil {
 		return model.Article{}, err
 	}
@@ -92,9 +115,9 @@ func SaveArticle(article model.Article) (model.Article, error) {
 	return article, nil
 }
 
-// GetAllArticles retrieves all articles from the database.
-func GetAllArticles() ([]model.Article, error) {
-	rows, err := DB.Query("SELECT id, url, title, excerpt, image_url, created_at FROM articles ORDER BY created_at DESC")
+// GetAllArticles retrieves all articles from the database for a specific user.
+func GetAllArticles(userID int) ([]model.Article, error) {
+	rows, err := DB.Query("SELECT id, user_id, url, title, excerpt, image_url, created_at FROM articles WHERE user_id = ? ORDER BY created_at DESC", userID)
 	if err != nil {
 		return nil, err
 	}
@@ -103,7 +126,7 @@ func GetAllArticles() ([]model.Article, error) {
 	var articles []model.Article
 	for rows.Next() {
 		var article model.Article
-		if err := rows.Scan(&article.ID, &article.URL, &article.Title, &article.Excerpt, &article.ImageURL, &article.CreatedAt); err != nil {
+		if err := rows.Scan(&article.ID, &article.UserID, &article.URL, &article.Title, &article.Excerpt, &article.ImageURL, &article.CreatedAt); err != nil {
 			return nil, err
 		}
 
@@ -122,11 +145,11 @@ func GetAllArticles() ([]model.Article, error) {
 	return articles, nil
 }
 
-// GetArticleByID retrieves a single article by its ID.
-func GetArticleByID(id int) (model.Article, error) {
+// GetArticleByID retrieves a single article by its ID and user ID.
+func GetArticleByID(id int, userID int) (model.Article, error) {
 	var article model.Article
-	err := DB.QueryRow("SELECT id, url, title, content, excerpt, image_url, created_at FROM articles WHERE id = ?", id).
-		Scan(&article.ID, &article.URL, &article.Title, &article.Content, &article.Excerpt, &article.ImageURL, &article.CreatedAt)
+	err := DB.QueryRow("SELECT id, user_id, url, title, content, excerpt, image_url, created_at FROM articles WHERE id = ? AND user_id = ?", id, userID).
+		Scan(&article.ID, &article.UserID, &article.URL, &article.Title, &article.Content, &article.Excerpt, &article.ImageURL, &article.CreatedAt)
 
 	if err != nil {
 		return model.Article{}, err
@@ -142,15 +165,15 @@ func GetArticleByID(id int) (model.Article, error) {
 	return article, nil
 }
 
-// DeleteArticleByID deletes an article by its ID.
-func DeleteArticleByID(id int) error {
-	stmt, err := DB.Prepare("DELETE FROM articles WHERE id = ?")
+// DeleteArticleByID deletes an article by its ID and user ID.
+func DeleteArticleByID(id int, userID int) error {
+	stmt, err := DB.Prepare("DELETE FROM articles WHERE id = ? AND user_id = ?")
 	if err != nil {
 		return err
 	}
 	defer stmt.Close()
 
-	result, err := stmt.Exec(id)
+	result, err := stmt.Exec(id, userID)
 	if err != nil {
 		return err
 	}
@@ -167,12 +190,12 @@ func DeleteArticleByID(id int) error {
 	return nil
 }
 
-// GetOrCreateTag gets an existing tag or creates a new one.
-func GetOrCreateTag(tagName string) (model.Tag, error) {
+// GetOrCreateTag gets an existing tag or creates a new one for a specific user.
+func GetOrCreateTag(tagName string, userID int) (model.Tag, error) {
 	var tag model.Tag
 
-	// Try to get existing tag
-	err := DB.QueryRow("SELECT id, name FROM tags WHERE name = ?", tagName).Scan(&tag.ID, &tag.Name)
+	// Try to get existing tag for this user
+	err := DB.QueryRow("SELECT id, name FROM tags WHERE name = ? AND user_id = ?", tagName, userID).Scan(&tag.ID, &tag.Name)
 	if err == nil {
 		return tag, nil
 	}
@@ -181,14 +204,14 @@ func GetOrCreateTag(tagName string) (model.Tag, error) {
 		return model.Tag{}, err
 	}
 
-	// Create new tag
-	stmt, err := DB.Prepare("INSERT INTO tags(name) VALUES(?)")
+	// Create new tag for this user
+	stmt, err := DB.Prepare("INSERT INTO tags(user_id, name) VALUES(?, ?)")
 	if err != nil {
 		return model.Tag{}, err
 	}
 	defer stmt.Close()
 
-	res, err := stmt.Exec(tagName)
+	res, err := stmt.Exec(userID, tagName)
 	if err != nil {
 		return model.Tag{}, err
 	}
@@ -204,10 +227,10 @@ func GetOrCreateTag(tagName string) (model.Tag, error) {
 }
 
 // AddTagToArticleByID adds a tag to an article.
-func AddTagToArticleByID(articleID int, tagName string) error {
-	// Check if article exists
+func AddTagToArticleByID(articleID int, tagName string, userID int) error {
+	// Check if article exists and belongs to the user
 	var exists bool
-	err := DB.QueryRow("SELECT EXISTS(SELECT 1 FROM articles WHERE id = ?)", articleID).Scan(&exists)
+	err := DB.QueryRow("SELECT EXISTS(SELECT 1 FROM articles WHERE id = ? AND user_id = ?)", articleID, userID).Scan(&exists)
 	if err != nil {
 		return err
 	}
@@ -215,8 +238,8 @@ func AddTagToArticleByID(articleID int, tagName string) error {
 		return sql.ErrNoRows
 	}
 
-	// Get or create tag
-	tag, err := GetOrCreateTag(tagName)
+	// Get or create tag for this user
+	tag, err := GetOrCreateTag(tagName, userID)
 	if err != nil {
 		return err
 	}
@@ -281,9 +304,9 @@ func GetTagsForArticle(articleID int) ([]model.Tag, error) {
 	return tags, nil
 }
 
-// SearchArticlesByTitle searches articles by title using LIKE query.
-func SearchArticlesByTitle(query string) ([]model.Article, error) {
-	rows, err := DB.Query("SELECT id, url, title, excerpt, image_url, created_at FROM articles WHERE title LIKE ? ORDER BY created_at DESC", "%"+query+"%")
+// SearchArticlesByTitle searches articles by title using LIKE query for a specific user.
+func SearchArticlesByTitle(query string, userID int) ([]model.Article, error) {
+	rows, err := DB.Query("SELECT id, user_id, url, title, excerpt, image_url, created_at FROM articles WHERE title LIKE ? AND user_id = ? ORDER BY created_at DESC", "%"+query+"%", userID)
 	if err != nil {
 		return nil, err
 	}
@@ -292,7 +315,7 @@ func SearchArticlesByTitle(query string) ([]model.Article, error) {
 	var articles []model.Article
 	for rows.Next() {
 		var article model.Article
-		if err := rows.Scan(&article.ID, &article.URL, &article.Title, &article.Excerpt, &article.ImageURL, &article.CreatedAt); err != nil {
+		if err := rows.Scan(&article.ID, &article.UserID, &article.URL, &article.Title, &article.Excerpt, &article.ImageURL, &article.CreatedAt); err != nil {
 			return nil, err
 		}
 
@@ -310,15 +333,15 @@ func SearchArticlesByTitle(query string) ([]model.Article, error) {
 	return articles, nil
 }
 
-// SearchArticlesByTag searches articles by tag name.
-func SearchArticlesByTag(tagName string) ([]model.Article, error) {
+// SearchArticlesByTag searches articles by tag name for a specific user.
+func SearchArticlesByTag(tagName string, userID int) ([]model.Article, error) {
 	rows, err := DB.Query(`
-		SELECT a.id, a.url, a.title, a.excerpt, a.image_url, a.created_at
+		SELECT a.id, a.user_id, a.url, a.title, a.excerpt, a.image_url, a.created_at
 		FROM articles a
 		JOIN article_tags at ON a.id = at.article_id
 		JOIN tags t ON at.tag_id = t.id
-		WHERE t.name LIKE ?
-		ORDER BY a.created_at DESC`, "%"+tagName+"%")
+		WHERE t.name LIKE ? AND a.user_id = ?
+		ORDER BY a.created_at DESC`, "%"+tagName+"%", userID)
 	if err != nil {
 		return nil, err
 	}
@@ -327,7 +350,7 @@ func SearchArticlesByTag(tagName string) ([]model.Article, error) {
 	var articles []model.Article
 	for rows.Next() {
 		var article model.Article
-		if err := rows.Scan(&article.ID, &article.URL, &article.Title, &article.Excerpt, &article.ImageURL, &article.CreatedAt); err != nil {
+		if err := rows.Scan(&article.ID, &article.UserID, &article.URL, &article.Title, &article.Excerpt, &article.ImageURL, &article.CreatedAt); err != nil {
 			return nil, err
 		}
 
@@ -343,4 +366,61 @@ func SearchArticlesByTag(tagName string) ([]model.Article, error) {
 	}
 
 	return articles, nil
+}
+
+// ===== 用户相关数据库操作 =====
+
+// UserExists 检查用户名或邮箱是否已存在
+func UserExists(username, email string) bool {
+	query := "SELECT COUNT(*) FROM users WHERE username = ? OR email = ?"
+	var count int
+	err := DB.QueryRow(query, username, email).Scan(&count)
+	if err != nil {
+		log.Printf("Error checking user existence: %v", err)
+		return false
+	}
+	return count > 0
+}
+
+// CreateUser 创建新用户
+func CreateUser(user model.User) (int, error) {
+	stmt, err := DB.Prepare("INSERT INTO users(username, email, password) VALUES(?, ?, ?)")
+	if err != nil {
+		return 0, err
+	}
+	defer stmt.Close()
+
+	res, err := stmt.Exec(user.Username, user.Email, user.Password)
+	if err != nil {
+		return 0, err
+	}
+
+	id, err := res.LastInsertId()
+	if err != nil {
+		return 0, err
+	}
+
+	return int(id), nil
+}
+
+// GetUserByUsername 根据用户名获取用户
+func GetUserByUsername(username string) (*model.User, error) {
+	query := "SELECT id, username, email, password, created_at FROM users WHERE username = ?"
+	var user model.User
+	err := DB.QueryRow(query, username).Scan(&user.ID, &user.Username, &user.Email, &user.Password, &user.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
+// GetUserByID 根据ID获取用户
+func GetUserByID(userID int) (*model.User, error) {
+	query := "SELECT id, username, email, password, created_at FROM users WHERE id = ?"
+	var user model.User
+	err := DB.QueryRow(query, userID).Scan(&user.ID, &user.Username, &user.Email, &user.Password, &user.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
 }
